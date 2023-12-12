@@ -4,11 +4,9 @@ import {
   useContractRead,
   useContractWrite,
   usePrepareContractWrite,
-  useWaitForTransaction,
   useWalletClient,
 } from "wagmi";
 
-import { PROXY_ABI } from "@d8x/perpetuals-sdk";
 import { useAtomValue } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useExchangeInfo from "../../hooks/useExchangeInfo";
@@ -117,7 +115,7 @@ export function DepositLots() {
       depositAmount > 0
       ? parseUnits((lotSize * depositAmount).toString(), marginTokenDecimals)
       : undefined;
-  }, [lotSize, depositAmount]);
+  }, [lotSize, depositAmount, marginTokenDecimals]);
 
   const { data: allowance } = useContractRead({
     address: poolTokenAddr,
