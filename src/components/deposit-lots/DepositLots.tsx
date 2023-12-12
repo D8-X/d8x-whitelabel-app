@@ -1,17 +1,23 @@
 import {
+  erc20ABI,
+  useAccount,
+  useContractRead,
   useContractWrite,
+  usePrepareContractWrite,
   useWaitForTransaction,
   useWalletClient,
 } from "wagmi";
 
 import { PROXY_ABI } from "@d8x/perpetuals-sdk";
 import { useAtomValue } from "jotai";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useExchangeInfo from "../../hooks/useExchangeInfo";
 import useTraderAPI from "../../hooks/useTraderAPI";
 import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
 import { Box, Button, Grid, Paper, styled } from "@mui/material";
 import { ResponsiveInput } from "../responsive-input/ResponsiveInput";
+import { parseUnits } from "viem";
+import { DEPOSIT_ABI } from "../../constants";
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -22,6 +28,7 @@ const Item = styled(Paper)(({ theme }) => ({
 }));
 
 export function DepositLots() {
+  const { address, isConnected } = useAccount();
   const { data: wallet } = useWalletClient();
   const { traderAPI, isLoading: isTraderAPILoading } = useTraderAPI(
     wallet?.chain.id
@@ -69,24 +76,122 @@ export function DepositLots() {
       console.error(e);
     }
     return id;
-  }, [traderAPI, wallet?.chain.id, isTraderAPILoading, selectedPoolSymbol]);
+  }, [traderAPI, wallet?.chain?.id, isTraderAPILoading, selectedPoolSymbol]);
 
-  const { data, write } = useContractWrite({
+  const marginTokenDecimals = useMemo(() => {
+    if (
+      !traderAPI ||
+      isTraderAPILoading ||
+      selectedPoolSymbol === "" ||
+      traderAPI.chainId !== wallet?.chain?.id
+    ) {
+      return undefined;
+    }
+    let decimals: number | undefined = undefined;
+    try {
+      traderAPI.getPoolStaticInfoIndexFromSymbol(selectedPoolSymbol);
+      decimals = traderAPI.getMarginTokenDecimalsFromSymbol(selectedPoolSymbol);
+    } catch (e) {
+      console.error(e);
+    }
+    return decimals;
+  }, [traderAPI, wallet?.chain?.id, isTraderAPILoading, selectedPoolSymbol]);
+
+  const poolTokenAddr = useMemo(() => {
+    if (selectedPoolSymbol === "" || !exchangeInfo) {
+      return undefined;
+    }
+    return exchangeInfo?.pools.find(
+      (pool) => pool.poolSymbol === selectedPoolSymbol && pool.isRunning
+    )?.marginTokenAddr as `0x${string}` | undefined;
+  }, [exchangeInfo, selectedPoolSymbol]);
+
+  const proxyAddr = useMemo(() => {
+    return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
+  }, [exchangeInfo]);
+
+  const amountInUnits = useMemo(() => {
+    return lotSize !== undefined &&
+      depositAmount !== undefined &&
+      marginTokenDecimals !== undefined &&
+      depositAmount > 0
+      ? parseUnits((lotSize * depositAmount).toString(), marginTokenDecimals)
+      : undefined;
+  }, [lotSize, depositAmount]);
+
+  const { data: allowance } = useContractRead({
+    address: poolTokenAddr,
+    abi: erc20ABI,
+    functionName: "allowance",
+    chainId: wallet?.chain?.id,
+    enabled:
+      isConnected && wallet?.chain?.id === 1101 && proxyAddr !== undefined,
+    args: [
+      wallet?.account?.address as `0x${string}`,
+      proxyAddr as `0x${string}`,
+    ],
+  });
+
+  const { config: approveConfig } = usePrepareContractWrite({
+    address: poolTokenAddr,
+    abi: erc20ABI,
+    functionName: "approve",
+    chainId: wallet?.chain?.id,
+    enabled:
+      isConnected &&
+      wallet?.chain !== undefined &&
+      proxyAddr !== undefined &&
+      allowance !== undefined &&
+      amountInUnits !== undefined &&
+      amountInUnits > allowance,
+    args: [proxyAddr as `0x${string}`, amountInUnits as bigint],
+  });
+
+  const { config: depositLotsConfig } = usePrepareContractWrite({
     address: exchangeInfo?.proxyAddr as `0x${string}` | undefined,
-    abi: [...PROXY_ABI],
+    abi: DEPOSIT_ABI,
     functionName: "depositBrokerLots",
-    chainId: wallet?.chain.id,
-    args: [poolId, +depositAmount],
-    enabled: !!traderAPI && Boolean(depositAmount),
-    gas: BigInt(1_000_000),
+    chainId: wallet?.chain?.id,
+    enabled:
+      !!traderAPI &&
+      isConnected &&
+      poolId !== undefined &&
+      wallet?.chain !== undefined &&
+      allowance !== undefined &&
+      amountInUnits !== undefined &&
+      poolId > 0 &&
+      depositAmount > 0 &&
+      allowance >= amountInUnits,
+    args: [poolId as number, depositAmount],
+    gas: 1_000_000n,
+    account: address,
   });
 
-  useWaitForTransaction({
-    hash: data?.hash,
-    onSuccess: () => {
-      console.log("txn", data?.hash);
-    },
-  });
+  const { writeAsync: approve, status: approvalStatus } =
+    useContractWrite(approveConfig);
+
+  const { writeAsync: execute } = useContractWrite(depositLotsConfig);
+
+  const depositLots = async () => {
+    if (
+      allowance === undefined ||
+      amountInUnits === undefined ||
+      depositAmount <= 0n
+    ) {
+      return;
+    }
+    if (allowance < amountInUnits) {
+      await approve?.();
+    } else {
+      await execute?.();
+    }
+  };
+
+  useEffect(() => {
+    if (approvalStatus === "success") {
+      execute?.().then();
+    }
+  }, [execute, approvalStatus]);
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -95,7 +200,7 @@ export function DepositLots() {
           <Item variant="outlined">
             <Button
               onClick={() => {
-                write?.();
+                depositLots().then();
               }}
               disabled={depositAmount <= 0}
             >
