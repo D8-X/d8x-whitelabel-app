@@ -1,7 +1,7 @@
-import { useWalletClient } from "wagmi";
+import { useBalance, useWalletClient } from "wagmi";
 import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
 import { useAtom } from "jotai";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import useBrokerTool from "../../hooks/useBrokerTool";
 import { Box, Grid, Paper, styled } from "@mui/material";
 
@@ -15,6 +15,23 @@ const Item = styled(Paper)(({ theme }) => ({
 
 export const Summary = memo(() => {
   const { data } = useWalletClient();
+
+  const chainId = useMemo(() => {
+    return data?.chain?.id;
+  }, [data?.chain]);
+
+  const utilityTokenAddr = useMemo(() => {
+    if (chainId === 1442) {
+      return "0x9a1E6C2f81bE72Af2C4138Bbec3d9029516f27a6";
+    } else if (chainId === 195) {
+      return "0xd08B8E59a36BaA7EED60E21C1D6a7778811C30eD";
+    } else if (chainId !== undefined) {
+      return "0xDc28023CCdfbE553643c41A335a4F555Edf937Df";
+    } else {
+      return undefined;
+    }
+  }, [chainId]);
+
   const { brokerTool, isLoading: isToolLoading } = useBrokerTool(
     data?.chain.id
   );
@@ -32,6 +49,11 @@ export const Summary = memo(() => {
   const [stakeFee, setStakeFee] = useState<number | undefined>(undefined);
 
   const [totalFee, setTotalFee] = useState<number | undefined>(undefined);
+
+  const { data: utilityTokenBalance } = useBalance({
+    address: data?.account?.address,
+    token: utilityTokenAddr,
+  });
 
   useEffect(() => {
     if (!!brokerTool && !isToolLoading && selectedPoolSymbol !== "") {
@@ -83,7 +105,9 @@ export const Summary = memo(() => {
           <Item>Owned</Item>
         </Grid>
         <Grid item xs={3}>
-          <Item>{"-"}</Item>
+          <Item>
+            {utilityTokenBalance ? utilityTokenBalance.formatted : "-"}
+          </Item>
         </Grid>
         <Grid item xs={3}>
           <Item>Induced Fee</Item>
