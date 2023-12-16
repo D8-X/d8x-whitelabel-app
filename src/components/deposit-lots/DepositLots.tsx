@@ -4,6 +4,7 @@ import {
   useContractRead,
   useContractWrite,
   usePrepareContractWrite,
+  useWaitForTransaction,
   useWalletClient,
 } from "wagmi";
 
@@ -117,13 +118,12 @@ export function DepositLots() {
       : undefined;
   }, [lotSize, depositAmount, marginTokenDecimals]);
 
-  const { data: allowance } = useContractRead({
+  const { data: allowance, refetch: refetchAllowance } = useContractRead({
     address: poolTokenAddr,
     abi: erc20ABI,
     functionName: "allowance",
     chainId: wallet?.chain?.id,
-    enabled:
-      isConnected && wallet?.chain?.id === 1101 && proxyAddr !== undefined,
+    enabled: proxyAddr !== undefined && wallet?.account?.address !== undefined,
     args: [
       wallet?.account?.address as `0x${string}`,
       proxyAddr as `0x${string}`,
@@ -165,16 +165,29 @@ export function DepositLots() {
     account: address,
   });
 
-  const { writeAsync: approve, status: approvalStatus } =
-    useContractWrite(approveConfig);
+  const {
+    data: approveTxn,
+    writeAsync: approve,
+    isSuccess: isApproved,
+  } = useContractWrite(approveConfig);
 
   const { writeAsync: execute } = useContractWrite(depositLotsConfig);
+
+  useWaitForTransaction({
+    hash: approveTxn?.hash,
+    onSuccess: () => {
+      console.log("approve txn", approveTxn?.hash);
+    },
+    onSettled: () => {
+      refetchAllowance?.().then();
+    },
+  });
 
   const depositLots = async () => {
     if (
       allowance === undefined ||
       amountInUnits === undefined ||
-      depositAmount <= 0n
+      amountInUnits <= 0n
     ) {
       return;
     }
@@ -186,10 +199,10 @@ export function DepositLots() {
   };
 
   useEffect(() => {
-    if (approvalStatus === "success") {
+    if (isApproved) {
       execute?.().then();
     }
-  }, [execute, approvalStatus]);
+  }, [isApproved, execute]);
 
   return (
     <Box sx={{ flexGrow: 1 }}>
