@@ -248,10 +248,10 @@
     stream-browserify "^3.0.0"
     util "^0.12.4"
 
-"@d8x/perpetuals-sdk@1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@d8x/perpetuals-sdk/-/perpetuals-sdk-1.0.2.tgz#72979c0a85809cf126be39322528d95c20ae5d5d"
-  integrity sha512-mw9f2jALkpFVmbqEhm+63GkMtQOoamLyOwSoI43tKINKL69YH/uDr1WPQE9+XK3iRwhRE1m7haSwJ4ujyC7SKg==
+"@d8x/perpetuals-sdk@1.0.10":
+  version "1.0.10"
+  resolved "https://registry.yarnpkg.com/@d8x/perpetuals-sdk/-/perpetuals-sdk-1.0.10.tgz#f5024d7fe6933058eb658e50f91144b16c9c40c1"
+  integrity sha512-Jjn3qhWaD/gZayn3k1R85R1XZStLrZvLdl2o4YW5IKAFukUp6/hhkZuespCsc0Bgu6H8hZzTkZdGJMUfU0V5zQ==
   dependencies:
     "@ethersproject/abi" "^5.7.0"
     "@ethersproject/abstract-signer" "^5.7.0"

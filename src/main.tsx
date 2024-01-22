@@ -1,13 +1,21 @@
 import "./polyfills";
 import "@rainbow-me/rainbowkit/styles.css";
 
-import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import {
+  getDefaultWallets,
+  lightTheme,
+  RainbowKitProvider,
+} from "@rainbow-me/rainbowkit";
 import { configureChains, createConfig, WagmiConfig } from "wagmi";
 import { polygonZkEvm, polygonZkEvmTestnet } from "wagmi/chains";
 import { publicProvider } from "wagmi/providers/public";
-import React from "react";
+import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { theme } from "./styles/theme/theme";
+import { StyledEngineProvider, ThemeProvider } from "@mui/material";
+
+import "styles/index.scss";
 
 const { chains, publicClient } = configureChains(
   [polygonZkEvm, polygonZkEvmTestnet],
@@ -27,11 +35,20 @@ const wagmiConfig = createConfig({
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <WagmiConfig config={wagmiConfig}>
-      <RainbowKitProvider chains={chains}>
-        <App />
-      </RainbowKitProvider>
-    </WagmiConfig>
-  </React.StrictMode>
+  <StrictMode>
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={theme}>
+        <WagmiConfig config={wagmiConfig}>
+          <RainbowKitProvider
+            chains={chains}
+            theme={lightTheme({
+              accentColor: "var(--d8x-color-black)",
+            })}
+          >
+            <App />
+          </RainbowKitProvider>
+        </WagmiConfig>
+      </ThemeProvider>
+    </StyledEngineProvider>
+  </StrictMode>
 );

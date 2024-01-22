@@ -1,10 +1,6 @@
-import classnames from "classnames";
 import { memo, type ChangeEvent, type ReactNode } from "react";
 
 import { Box, InputAdornment, OutlinedInput, Typography } from "@mui/material";
-
-// import { ReactComponent as DecreaseIcon } from "assets/icons/decreaseIcon.svg";
-// import { ReactComponent as IncreaseIcon } from "assets/icons/increaseIcon.svg";
 
 import styles from "./ResponsiveInput.module.scss";
 
@@ -20,6 +16,7 @@ interface ResponsiveInputPropsI {
   min?: number;
   max?: number;
   adornmentAction?: ReactNode;
+  disabled?: boolean;
 }
 
 export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
@@ -35,6 +32,7 @@ export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
     min = -1,
     max,
     adornmentAction,
+    disabled,
   } = props;
 
   const handleValueChange = (
@@ -51,14 +49,13 @@ export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
   };
 
   const inputNumeric = inputValue !== null ? +inputValue : null;
-
   return (
-    <Box className={classnames(styles.root, className)}>
+    <Box className={`${styles.root} ${className}`}>
       <OutlinedInput
         id={id}
         endAdornment={
           <InputAdornment position="end" className={styles.inputAdornment}>
-            <Typography variant="adornment">{currency}</Typography>
+            <Typography>{currency}</Typography>
             {adornmentAction}
           </InputAdornment>
         }
@@ -68,6 +65,7 @@ export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
         onChange={handleValueChange}
         onBlur={handleInputBlur}
         value={inputNumeric === null ? "" : inputValue}
+        disabled={disabled}
       />
     </Box>
   );

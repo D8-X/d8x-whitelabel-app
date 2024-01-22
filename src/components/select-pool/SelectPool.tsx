@@ -1,78 +1,63 @@
-import { useWalletClient } from "wagmi";
-import useExchangeInfo from "../../hooks/useExchangeInfo";
-import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
 import { useAtom } from "jotai";
-import { memo, useMemo } from "react";
-import useTraderAPI from "../../hooks/useTraderAPI";
-import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { memo, useEffect, useMemo } from "react";
+import { useWalletClient } from "wagmi";
+
+import { FormControl, Select } from "@mui/material";
+
+import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
+
+import styles from "./SelectPool.module.scss";
+import useExchangeInfo from "../../hooks/useExchangeInfo";
 
 export const SelectPool = memo(() => {
   const { data } = useWalletClient();
-  const { traderAPI } = useTraderAPI(data?.chain.id);
-  const { exchangeInfo, isLoading } = useExchangeInfo(data?.chain.id);
+  const { exchangeInfo, isLoading } = useExchangeInfo(data?.chain?.id);
   const [selectedPoolSymbol, setSelectedPoolSymbol] = useAtom(
     selectedPoolSymbolAtom
   );
 
   const symbols = useMemo(() => {
-    if (isLoading || !exchangeInfo || traderAPI?.chainId !== data?.chain.id) {
+    if (isLoading || !exchangeInfo) {
       return [];
     }
     return exchangeInfo.pools
       .filter((pool) => pool.isRunning)
       .map((pool) => pool.poolSymbol);
-  }, [traderAPI, exchangeInfo, isLoading, data?.chain.id]);
+  }, [exchangeInfo, isLoading]);
+
+  useEffect(() => {
+    if (symbols.length > 0) {
+      setSelectedPoolSymbol(symbols[0]);
+    }
+  }, [symbols, setSelectedPoolSymbol]);
+
+  useEffect(() => {
+    setSelectedPoolSymbol("");
+  }, [data?.chain?.id, setSelectedPoolSymbol]);
 
   return (
-    <Box
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-      marginInline={50}
+    <FormControl
+      fullWidth
+      variant="standard"
+      margin="normal"
+      className={styles.root}
     >
-      <FormControl fullWidth variant="standard" margin="normal">
-        <InputLabel id="demo-simple-select-label">Liquidity Pool</InputLabel>
-        <Select
-          labelId="demo-simple-select-label"
-          id="demo-simple-select"
-          value={selectedPoolSymbol}
-          label="Age"
-          onChange={(e) => {
-            setSelectedPoolSymbol(e.target.value);
-          }}
-        >
-          {symbols.map((poolSymbol) => (
-            <MenuItem value={poolSymbol}> {poolSymbol} </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Box>
+      <Select
+        placeholder="Collateral currency"
+        id="select-pool-id"
+        value={selectedPoolSymbol}
+        label=""
+        native={true}
+        onChange={(e) => {
+          setSelectedPoolSymbol(e.target.value);
+        }}
+      >
+        {symbols.map((poolSymbol) => (
+          <option key={poolSymbol} value={poolSymbol}>
+            {poolSymbol}
+          </option>
+        ))}
+      </Select>
+    </FormControl>
   );
 });
-
-//   return (
-//     <Box>
-//       {isLoading && <div>Loading exchange information...</div>}
-//       <form hidden={!exchangeInfo || isLoading}>
-//         <label htmlFor="pools">Select Pool </label>
-//         <select
-//           id="pools"
-//           onChange={(e) => {
-//             setSelectedPoolSymbol(e.target.value);
-//           }}
-//           value={selectedPoolSymbol}
-//         >
-//           <option disabled value="">
-//             -
-//           </option>
-//           {symbols.map((poolSymbol) => (
-//             <option value={poolSymbol} key={poolSymbol}>
-//               {poolSymbol}
-//             </option>
-//           ))}
-//         </select>
-//         <div> Lot size: {lotSize ?? "-"} </div>
-//       </form>
-//     </Box>
-//   );
-// });

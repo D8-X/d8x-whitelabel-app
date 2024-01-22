@@ -1,0 +1,93 @@
+@import 'src/styles/theme/_theme.scss';
+
+.h1 {
+  font-size: 4.5rem;
+  font-weight: 500;
+  font-family: $d8x-font-primary;
+
+  @include media-wide {
+    font-size: 4.5rem;
+  }
+
+  @include media-phone {
+    font-size: 2.375rem;
+  }
+}
+
+.h2 {
+  font-size: 2rem;
+
+  @include media-phone {
+    font-size: 1rem;
+  }
+}
+
+.h3 {
+  font-size: 3rem;
+  line-height: 3.625rem;
+  font-family: $d8x-font-primary;
+
+  @include media-wide {
+    font-size: 2rem;
+    line-height: 1.25;
+  }
+}
+
+.h4 {
+  font-size: 1.75rem;
+
+  @include media-wide {
+    font-size: 1.5rem;
+  }
+
+  @include media-phone {
+    font-size: 1.125rem;
+  }
+}
+
+.h5 {
+  font-size: 1.125rem;
+
+  @include media-wide {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  @include media-phone {
+    font-size: 0.875rem;
+  }
+}
+
+.h6 {
+  font-size: 1.125rem;
+}
+
+.body1 {
+  font-size: 2rem;
+  line-height: 2.4375rem;
+
+  @include media-wide {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+
+  @include media-phone {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+}
+
+.body2 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+
+  @include media-wide {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  @include media-phone {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+}
