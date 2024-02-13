@@ -161,7 +161,7 @@ export function DepositLots() {
       depositAmount > 0 &&
       allowance >= amountInUnits,
     args: [poolId as number, depositAmount],
-    gas: 1_000_000n,
+    gas: 2_000_000n,
     account: address,
   });
 
