@@ -4,6 +4,7 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { configureChains, createConfig, WagmiConfig } from "wagmi";
 import {
+  arbitrum,
   arbitrumSepolia,
   polygonZkEvm,
   polygonZkEvmTestnet,
@@ -14,7 +15,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 
 const { chains, publicClient } = configureChains(
-  [polygonZkEvm, polygonZkEvmTestnet, arbitrumSepolia],
+  [polygonZkEvm, arbitrum, polygonZkEvmTestnet, arbitrumSepolia],
   [publicProvider()]
 );
 
