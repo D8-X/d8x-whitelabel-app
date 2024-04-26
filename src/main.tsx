@@ -8,6 +8,7 @@ import {
   arbitrumSepolia,
   polygonZkEvm,
   polygonZkEvmTestnet,
+  xlayer,
 } from "wagmi/chains";
 import { publicProvider } from "wagmi/providers/public";
 import React from "react";
@@ -15,7 +16,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 
 const { chains, publicClient } = configureChains(
-  [polygonZkEvm, arbitrum, polygonZkEvmTestnet, arbitrumSepolia],
+  [polygonZkEvm, arbitrum, polygonZkEvmTestnet, arbitrumSepolia, xlayer],
   [publicProvider()]
 );
 
