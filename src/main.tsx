@@ -8,8 +8,8 @@ import {
   arbitrumSepolia,
   polygonZkEvm,
   polygonZkEvmTestnet,
-  xlayer,
 } from "wagmi/chains";
+import { xlayer } from './chains';
 import { publicProvider } from "wagmi/providers/public";
 import React from "react";
 import ReactDOM from "react-dom/client";
