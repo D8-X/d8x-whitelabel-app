@@ -21,9 +21,13 @@ import { DEPOSIT_ABI } from "../../constants";
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
   ...theme.typography.body2,
-  padding: theme.spacing(1),
   textAlign: "center",
   color: theme.palette.text.secondary,
+  display: 'flex', // Ensure flex to stretch child components
+  justifyContent: 'center', // Center align items
+  padding: 0, // Remove padding to allow full-width usage
+  margin: 0, // Remove margins that could affect the layout
+  width: '100%', // Ensure the item itself is full-width if not already
 }));
 
 export function DepositLots() {
@@ -206,33 +210,43 @@ export function DepositLots() {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <Grid container spacing={2} marginTop={2}>
-        <Grid item xs={6} marginTop={1}>
-          <Item variant="outlined">
-            <Button
-              onClick={() => {
-                depositLots().then();
-              }}
-              disabled={depositAmount <= 0}
-            >
-              {" "}
-              Buy Lots{" "}
-            </Button>
-          </Item>
-        </Grid>
+      <Grid container spacing={2} marginTop={2} >
         <Grid item xs={6}>
-          <Item elevation={0}>
+          <Item elevation={0} sx={{ backgroundColor: '#201b35' }}>
             <ResponsiveInput
               id="deposit-lots-amount"
               inputValue={inputValue}
               setInputValue={handleInputCapture}
               currency={`${
-                (lotSize ?? 0) * depositAmount
+                ((lotSize ?? 0) * depositAmount).toFixed(5)
               } ${selectedPoolSymbol}`}
-              // step="1"
-              // min={0}
-              // max={poolTokenBalance || 999999}
             />
+          </Item>
+        </Grid>
+        <Grid item xs={6}>
+          <Item>
+            <Button
+              onClick={() => {
+                depositLots().then();
+              }}
+              disabled={depositAmount <= 0}
+              variant="contained"  // Use the contained style for more emphasis
+              color="primary"      // Make the button stand out with a primary color
+              size="large"         // Optionally increase the size for better accessibility
+              fullWidth={true}
+              sx={{
+                width: '100%',
+                height: '52px',
+                color: '#e0e0e0',
+                fontSize: "16px",
+                backgroundColor: '#7860e3', // Custom color
+                '&:hover': {
+                  backgroundColor: '#604db6' // Darker on hover
+                }
+              }}  // Optional: Make the button full width of its container
+            >
+              Buy Lots
+            </Button>
           </Item>
         </Grid>
       </Grid>

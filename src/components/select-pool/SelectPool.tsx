@@ -4,15 +4,13 @@ import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
 import { useAtom } from "jotai";
 import { memo, useMemo } from "react";
 import useTraderAPI from "../../hooks/useTraderAPI";
-import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { Box, FormControl, InputLabel, MenuItem, Select, CircularProgress } from "@mui/material";
 
 export const SelectPool = memo(() => {
   const { data } = useWalletClient();
   const { traderAPI } = useTraderAPI(data?.chain.id);
   const { exchangeInfo, isLoading } = useExchangeInfo(data?.chain.id);
-  const [selectedPoolSymbol, setSelectedPoolSymbol] = useAtom(
-    selectedPoolSymbolAtom
-  );
+  const [selectedPoolSymbol, setSelectedPoolSymbol] = useAtom(selectedPoolSymbolAtom);
 
   const symbols = useMemo(() => {
     if (isLoading || !exchangeInfo || traderAPI?.chainId !== data?.chain.id) {
@@ -23,56 +21,59 @@ export const SelectPool = memo(() => {
       .map((pool) => pool.poolSymbol);
   }, [traderAPI, exchangeInfo, isLoading, data?.chain.id]);
 
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight={100}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box
       display="flex"
       justifyContent="center"
       alignItems="center"
-      marginInline={50}
+      width="100%"  // Ensure it takes the full width of the container
     >
-      <FormControl fullWidth variant="standard" margin="normal">
+      <FormControl fullWidth variant="outlined" margin="normal" sx={{ width: '100%' }}>
         <InputLabel id="demo-simple-select-label">Liquidity Pool</InputLabel>
         <Select
           labelId="label-select-pool"
           id="id-select-pool"
-          value={selectedPoolSymbol}
-          label="Pool"
-          onChange={(e) => {
-            setSelectedPoolSymbol(e.target.value);
+          value={selectedPoolSymbol || ""} // Ensuring value is controlled properly
+          label="Liquidity Pool"
+          onChange={(e) => setSelectedPoolSymbol(e.target.value)}
+          sx={{
+            width: '100%', // Ensure the Select component fills its parent width
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: 'primary.main', // Ensures the outline is always visible
+            },
+            '&:hover .MuiOutlinedInput-notchedOutline': {
+              borderColor: 'primary.dark', // Darker on hover for better visibility
+            },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: 'secondary.main', // Changes when field is focused
+              borderWidth: '2px', // Makes the outline thicker on focus
+            }
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                bgcolor: '#201b35', // Change the dropdown background color here
+                color: 'primary.main', // Optional: change text color if needed
+              }
+            }
           }}
         >
+          <MenuItem value="" disabled>
+            Select a pool
+          </MenuItem>
           {symbols.map((poolSymbol) => (
-            <MenuItem value={poolSymbol}> {poolSymbol} </MenuItem>
+            <MenuItem key={poolSymbol} value={poolSymbol}>{poolSymbol}</MenuItem>
           ))}
         </Select>
       </FormControl>
     </Box>
   );
 });
-
-//   return (
-//     <Box>
-//       {isLoading && <div>Loading exchange information...</div>}
-//       <form hidden={!exchangeInfo || isLoading}>
-//         <label htmlFor="pools">Select Pool </label>
-//         <select
-//           id="pools"
-//           onChange={(e) => {
-//             setSelectedPoolSymbol(e.target.value);
-//           }}
-//           value={selectedPoolSymbol}
-//         >
-//           <option disabled value="">
-//             -
-//           </option>
-//           {symbols.map((poolSymbol) => (
-//             <option value={poolSymbol} key={poolSymbol}>
-//               {poolSymbol}
-//             </option>
-//           ))}
-//         </select>
-//         <div> Lot size: {lotSize ?? "-"} </div>
-//       </form>
-//     </Box>
-//   );
-// });
