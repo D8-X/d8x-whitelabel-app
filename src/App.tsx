@@ -27,12 +27,15 @@ const theme = createTheme({
       textTransform: 'none' // Removes uppercase transformation on buttons.
     }
   },
+  shape: {
+    borderRadius: 12 // Set global border radius to 12px for more rounded corners
+  },
   components: {
     // Apply baseline CSS across the app
     MuiCssBaseline: {
       styleOverrides: `
         body {
-          background-color: #fff; // Ensure the body background color is applied
+          background-color: #ddd9f3; // Ensure the body background color is applied
         }
       `
     }
@@ -69,7 +72,7 @@ function App() {
               </Typography>
               <Summary />
               <Typography variant="h6" color="secondary" gutterBottom>
-                Deposit Lots
+                Buy Lots
               </Typography>
               <DepositLots />
             </Paper>

@@ -36,7 +36,7 @@ export const SelectPool = memo(() => {
       alignItems="center"
       width="100%"  // Ensure it takes the full width of the container
     >
-      <FormControl fullWidth variant="outlined" margin="normal" sx={{ width: '100%' }}>
+      <FormControl fullWidth variant="outlined" margin="normal" sx={{ width: '100%', marginBottom: 4  }}>
         <InputLabel id="demo-simple-select-label">Liquidity Pool</InputLabel>
         <Select
           labelId="label-select-pool"

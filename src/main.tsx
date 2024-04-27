@@ -2,21 +2,25 @@ import "./polyfills";
 import "@rainbow-me/rainbowkit/styles.css";
 
 import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
-import { configureChains, createConfig, WagmiConfig } from "wagmi";
+import { Chain, configureChains, createConfig, WagmiConfig } from "wagmi";
 import {
   arbitrum,
   arbitrumSepolia,
   polygonZkEvm,
-  polygonZkEvmTestnet,
 } from "wagmi/chains";
 import { xlayer } from './chains';
 import { publicProvider } from "wagmi/providers/public";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import polygonIcon from './assets/icons/polygon.webp';
+import x1Icon from './assets/icons/x1.png';
+
+const polygonZkEvmCustom =  { ...polygonZkEvm, iconUrl: polygonIcon, iconBackground: 'transparent' } as Chain;
+const xlayerCustom =  { ...xlayer, iconUrl: x1Icon, iconBackground: 'transparent' } as Chain;
 
 const { chains, publicClient } = configureChains(
-  [polygonZkEvm, arbitrum, polygonZkEvmTestnet, arbitrumSepolia, xlayer],
+  [polygonZkEvmCustom, arbitrum, arbitrumSepolia, xlayerCustom],
   [publicProvider()]
 );
 

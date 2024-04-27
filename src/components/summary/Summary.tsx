@@ -3,7 +3,7 @@ import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
 import { useAtom } from "jotai";
 import { memo, useEffect, useMemo, useState } from "react";
 import useBrokerTool from "../../hooks/useBrokerTool";
-import { Box, Card, CardContent, Typography, CircularProgress, CardHeader, Divider, Grid } from "@mui/material";
+import { Box, Card, CardContent, Typography, CircularProgress, CardHeader, Divider, Grid, Tooltip } from "@mui/material";
 
 export const Summary = memo(() => {
   const { data } = useWalletClient();
@@ -55,7 +55,7 @@ export const Summary = memo(() => {
   }
 console.log(volumeUSD);
   return (
-    <Box sx={{ flexGrow: 1, padding: 2 }}>
+    <Box sx={{ flexGrow: 1, padding: 2, marginBottom: 4 }}>
       <Grid container spacing={2} justifyContent="center">
         <Grid item xs={12} sm={4}>
           <Card raised sx={{ backgroundColor: '#201b35' }}>
@@ -92,8 +92,17 @@ console.log(volumeUSD);
             <CardHeader title="Total Fees" titleTypographyProps={{ align: "center", variant: "h6" }} />
             <Divider />
             <CardContent>
-              <Typography variant="subtitle1">Final Fee: {totalFee !== undefined ? `${totalFee * 1e4} BP` : "Buy at least 1 lot to become a broker"}</Typography>
-            </CardContent>
+          <Typography variant="body2">
+            <Tooltip title="Exchange fee your customers will pay. Depends on the amount of lots you purchased, your $D8X holdings and your monthly trading volume." placement="top">
+              <span style={{
+                borderBottom: '1px dotted',
+                paddingBottom: '2px', // Adjust this value to increase vertical distance
+                lineHeight: 'normal' // Ensures the line height does not compress the padding
+              }}>Final Fee</span>
+             </Tooltip>
+            {': '}{totalFee !== undefined ? `${totalFee * 1e4} BP` : "Buy at least 1 lot to become a broker"}
+          </Typography>
+        </CardContent>
           </Card>
         </Grid>
       </Grid>

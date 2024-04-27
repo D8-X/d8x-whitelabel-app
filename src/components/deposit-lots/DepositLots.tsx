@@ -242,10 +242,14 @@ export function DepositLots() {
                 backgroundColor: '#7860e3', // Custom color
                 '&:hover': {
                   backgroundColor: '#604db6' // Darker on hover
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: '#4a426a', // Custom color for disabled state
+                  color: '#ccc'               // Optional: change text color in disabled state
                 }
               }}  // Optional: Make the button full width of its container
             >
-              Buy Lots
+                {(allowance ?? 0) > (amountInUnits ?? 0) ? "Buy Lots" : "Approve Allowance"}
             </Button>
           </Item>
         </Grid>
