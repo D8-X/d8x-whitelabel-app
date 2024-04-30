@@ -58,7 +58,7 @@ export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
         id={id}
         endAdornment={
           <InputAdornment position="end" className={styles.inputAdornment}>
-            <Typography variant="adornment">{currency}</Typography>
+            <Typography variant="adornment" style={{ color: '#e0e0e0' }}>{currency}</Typography>
             {adornmentAction}
           </InputAdornment>
         }
@@ -68,6 +68,7 @@ export const ResponsiveInput = memo((props: ResponsiveInputPropsI) => {
         onChange={handleValueChange}
         onBlur={handleInputBlur}
         value={inputNumeric === null ? "" : inputValue}
+        sx={{ width: 354 }} 
       />
     </Box>
   );
