@@ -1,8 +1,9 @@
-import { useWalletClient } from "wagmi";
-import useExchangeInfo from "../../hooks/useExchangeInfo";
-import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
-import { useAtom } from "jotai";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  selectedPoolIdAtom,
+  selectedPoolSymbolAtom,
+} from "../../store/blockchain.store";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { memo, useMemo } from "react";
 import {
   Box,
   FormControl,
@@ -11,21 +12,18 @@ import {
   Select,
   CircularProgress,
 } from "@mui/material";
+import { exchangeInfoAtom, traderAPIAtom } from "../../store/sdk.store";
 
 export const SelectPool = memo(() => {
-  const { data: walletClient } = useWalletClient();
-
-  const { exchangeInfo, refetch } = useExchangeInfo();
+  const exchangeInfo = useAtomValue(exchangeInfoAtom);
 
   const [selectedPoolSymbol, setSelectedPoolSymbol] = useAtom(
     selectedPoolSymbolAtom
   );
 
-  const fetchRef = useRef(false);
+  const api = useAtomValue(traderAPIAtom);
 
-  const chainId = useMemo(() => {
-    return walletClient?.chain?.id;
-  }, [walletClient]);
+  const setSelectedPoolId = useSetAtom(selectedPoolIdAtom);
 
   const symbols = useMemo(() => {
     if (!exchangeInfo) {
@@ -35,24 +33,6 @@ export const SelectPool = memo(() => {
       .filter((pool) => pool.isRunning)
       .map((pool) => pool.poolSymbol);
   }, [exchangeInfo]);
-
-  const handleChainChange = useCallback(
-    (newChain: number) => {
-      if (exchangeInfo?.chainId !== newChain) {
-        fetchRef.current = true;
-        refetch(newChain).then(() => {
-          fetchRef.current = false;
-        });
-      }
-    },
-    [exchangeInfo?.chainId, refetch]
-  );
-
-  useEffect(() => {
-    if (chainId) {
-      handleChainChange(chainId);
-    }
-  }, [chainId, handleChainChange]);
 
   if (!exchangeInfo) {
     return (
@@ -66,6 +46,11 @@ export const SelectPool = memo(() => {
       </Box>
     );
   }
+
+  const handleSelectPool = (symbol: string) => {
+    setSelectedPoolSymbol(symbol);
+    setSelectedPoolId(api?.getPoolIdFromSymbol(symbol));
+  };
 
   return (
     <Box
@@ -86,7 +71,7 @@ export const SelectPool = memo(() => {
           id="id-select-pool"
           value={selectedPoolSymbol || ""} // Ensuring value is controlled properly
           label="Liquidity Pool"
-          onChange={(e) => setSelectedPoolSymbol(e.target.value)}
+          onChange={(e) => handleSelectPool(e.target.value)}
           sx={{
             width: "100%", // Ensure the Select component fills its parent width
             "& .MuiOutlinedInput-notchedOutline": {

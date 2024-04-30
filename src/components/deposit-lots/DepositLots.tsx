@@ -10,13 +10,15 @@ import {
 
 import { useAtomValue } from "jotai";
 import { useCallback, useMemo, useRef, useState } from "react";
-import useExchangeInfo from "../../hooks/useExchangeInfo";
-import useTraderAPI from "../../hooks/useTraderAPI";
-import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
+import {
+  selectedPoolIdAtom,
+  selectedPoolSymbolAtom,
+} from "../../store/blockchain.store";
 import { Box, Button, Grid, Paper, styled } from "@mui/material";
 import { ResponsiveInput } from "../responsive-input/ResponsiveInput";
 import { parseUnits } from "viem";
 import { DEPOSIT_ABI } from "../../constants";
+import { exchangeInfoAtom, traderAPIAtom } from "../../store/sdk.store";
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -33,10 +35,11 @@ const Item = styled(Paper)(({ theme }) => ({
 export function DepositLots() {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const { api: traderAPI, isLoading: isTraderAPILoading } = useTraderAPI();
-  const { exchangeInfo } = useExchangeInfo();
 
+  const selectedPoolId = useAtomValue(selectedPoolIdAtom);
   const selectedPoolSymbol = useAtomValue(selectedPoolSymbolAtom);
+  const exchangeInfo = useAtomValue(exchangeInfoAtom);
+  const api = useAtomValue(traderAPIAtom);
 
   const [depositAmount, setDepositAmount] = useState(0);
   const [inputValue, setInputValue] = useState(`${depositAmount}`);
@@ -67,43 +70,6 @@ export function DepositLots() {
     inputValueChangedRef.current = true;
   }, []);
 
-  const poolId = useMemo(() => {
-    if (
-      !traderAPI ||
-      isTraderAPILoading ||
-      selectedPoolSymbol === "" ||
-      traderAPI.chainId !== chainId
-    ) {
-      return 0;
-    }
-    let id: number | undefined = undefined;
-    try {
-      id = traderAPI.getPoolIdFromSymbol(selectedPoolSymbol);
-    } catch (e) {
-      console.error(e);
-    }
-    return id;
-  }, [traderAPI, chainId, isTraderAPILoading, selectedPoolSymbol]);
-
-  const marginTokenDecimals = useMemo(() => {
-    if (
-      !traderAPI ||
-      isTraderAPILoading ||
-      selectedPoolSymbol === "" ||
-      traderAPI.chainId !== chainId
-    ) {
-      return undefined;
-    }
-    let decimals: number | undefined = undefined;
-    try {
-      traderAPI.getPoolStaticInfoIndexFromSymbol(selectedPoolSymbol);
-      decimals = traderAPI.getMarginTokenDecimalsFromSymbol(selectedPoolSymbol);
-    } catch (e) {
-      console.error(e);
-    }
-    return decimals;
-  }, [traderAPI, chainId, isTraderAPILoading, selectedPoolSymbol]);
-
   const poolTokenAddr = useMemo(() => {
     if (selectedPoolSymbol === "" || !exchangeInfo) {
       return undefined;
@@ -116,6 +82,19 @@ export function DepositLots() {
   const proxyAddr = useMemo(() => {
     return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
   }, [exchangeInfo]);
+
+  const marginTokenDecimals = useMemo(() => {
+    if (!api || selectedPoolSymbol === "") {
+      return undefined;
+    }
+    let decimals: number | undefined = undefined;
+    try {
+      decimals = api.getMarginTokenDecimalsFromSymbol(selectedPoolSymbol);
+    } catch (e) {
+      console.error(e);
+    }
+    return decimals;
+  }, [api, selectedPoolSymbol]);
 
   const amountInUnits = useMemo(() => {
     return lotSize !== undefined &&
@@ -160,16 +139,15 @@ export function DepositLots() {
     functionName: "depositBrokerLots",
     chainId: chainId,
     enabled:
-      !!traderAPI &&
       isConnected &&
-      poolId !== undefined &&
+      selectedPoolId !== undefined &&
       walletClient?.chain !== undefined &&
       allowance !== undefined &&
       amountInUnits !== undefined &&
-      poolId > 0 &&
+      selectedPoolId > 0 &&
       depositAmount > 0 &&
       allowance >= amountInUnits,
-    args: [poolId as number, depositAmount],
+    args: [selectedPoolId as number, depositAmount],
     gas: 2_000_000n,
     account: address,
   });
