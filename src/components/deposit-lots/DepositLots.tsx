@@ -105,7 +105,11 @@ export function DepositLots() {
       : undefined;
   }, [lotSize, depositAmount, marginTokenDecimals]);
 
-  const { data: allowance, refetch: refetchAllowance } = useContractRead({
+  const {
+    data: allowance,
+    refetch: refetchAllowance,
+    isFetching,
+  } = useContractRead({
     address: poolTokenAddr,
     abi: erc20ABI,
     functionName: "allowance",
@@ -216,7 +220,9 @@ export function DepositLots() {
                   ? depositLots().then()
                   : approveToken().then();
               }}
-              disabled={depositAmount <= 0 || transactionSent.current}
+              disabled={
+                depositAmount <= 0 || transactionSent.current || isFetching
+              }
               variant="contained" // Use the contained style for more emphasis
               color="primary" // Make the button stand out with a primary color
               size="large" // Optionally increase the size for better accessibility
