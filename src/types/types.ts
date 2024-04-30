@@ -1,6 +1,10 @@
 import { IClientOrder } from "@d8x/perpetuals-sdk/dist/esm/contracts/LimitOrderBook";
 import { AlignE } from "./enums";
+import { ExchangeInfo as ExchangeInfoSDK } from "@d8x/perpetuals-sdk";
 
+export interface ExchangeInfo extends ExchangeInfoSDK {
+  chainId: number;
+}
 export interface OrderBookPropsI {
   chainId: number;
   perpetualId: number;

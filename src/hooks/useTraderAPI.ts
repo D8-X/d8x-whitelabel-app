@@ -1,30 +1,49 @@
-import { useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { traderAPIAtom } from "../store/sdk.store";
 import { PerpetualDataHandler, TraderInterface } from "@d8x/perpetuals-sdk";
 
-const useTraderAPI = (chainId: number | undefined) => {
+const useTraderAPI = () => {
   const [traderAPI, setTraderAPI] = useAtom(traderAPIAtom);
-  const [isLoading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (
-      chainId === undefined ||
-      (!!traderAPI && traderAPI.chainId === chainId)
-    ) {
-      return;
-    }
-    setLoading(true);
-    const api = new TraderInterface(
-      PerpetualDataHandler.readSDKConfig(chainId)
-    );
-    api
-      .createProxyInstance()
-      .then(() => setTraderAPI(api))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [chainId, traderAPI, setTraderAPI, setLoading]);
-  return { traderAPI: traderAPI, isLoading: isLoading };
+  const isLoadingRef = useRef(false);
+
+  const [connectedChainId, setConnectedChainId] = useState(traderAPI?.chainId);
+
+  const connectAsync = useCallback(
+    async (_chainId: number) => {
+      if (
+        (traderAPI && connectedChainId === _chainId) ||
+        isLoadingRef.current
+      ) {
+        // already connected to this chain, or busy
+        return;
+      }
+
+      isLoadingRef.current = true;
+      const api = new TraderInterface(
+        PerpetualDataHandler.readSDKConfig(_chainId)
+      );
+      await api
+        .createProxyInstance()
+        .then(() => {
+          setTraderAPI(api);
+          setConnectedChainId(api.chainId);
+        })
+        .catch(console.error)
+        .finally(() => {
+          isLoadingRef.current = false;
+        });
+    },
+    [traderAPI, connectedChainId, setTraderAPI]
+  );
+
+  return {
+    api: traderAPI,
+    isLoading: isLoadingRef.current,
+    chainId: connectedChainId,
+    connect: isLoadingRef.current ? undefined : connectAsync,
+  };
 };
 
 export default useTraderAPI;
