@@ -10,4 +10,6 @@ export const perpetualStateAtom = atom<PerpetualState | undefined>(undefined);
 
 export const selectedPoolSymbolAtom = atom<string>("");
 
+export const selectedPoolIdAtom = atom<number | undefined>(undefined);
+
 export const d8xTokenAddress = atom<string>("");
