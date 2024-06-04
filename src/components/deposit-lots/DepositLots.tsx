@@ -225,9 +225,11 @@ export function DepositLots() {
     confirmations: 5,
     onSuccess: () => {
       console.log("approve txn confirmed", approveTxn?.hash);
-      setWaitingForTx(false);
       refetchBalance?.().then();
       refetchAllowance?.().then();
+    },
+    onSettled: () => {
+      setWaitingForTx(false);
     },
   });
 
@@ -236,10 +238,14 @@ export function DepositLots() {
     confirmations: 10,
     onSuccess: () => {
       console.log("deposit txn confirmed", depositTxn?.hash);
-      setWaitingForTx(false);
       refetchBalance?.().then();
       refetchAllowance?.().then();
+      setDepositAmount(0);
+      setInputValue("");
       setLastDepositTime(Date.now());
+    },
+    onSettled: () => {
+      setWaitingForTx(false);
     },
   });
 
