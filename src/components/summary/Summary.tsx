@@ -1,6 +1,9 @@
 import { useBalance, useWalletClient } from "wagmi";
-import { selectedPoolSymbolAtom } from "../../store/blockchain.store";
-import { useAtom } from "jotai";
+import {
+  lastDepositTimeAtom,
+  selectedPoolSymbolAtom,
+} from "../../store/blockchain.store";
+import { useAtom, useAtomValue } from "jotai";
 import { memo, useEffect, useMemo, useState } from "react";
 import useBrokerTool from "../../hooks/useBrokerTool";
 import {
@@ -37,6 +40,8 @@ export const Summary = memo(() => {
   );
   const [selectedPoolSymbol] = useAtom(selectedPoolSymbolAtom);
 
+  const lastDepositTime = useAtomValue(lastDepositTimeAtom);
+
   const [lotsPurchased, setLotsPurchased] = useState<number | undefined>(
     undefined
   );
@@ -52,7 +57,12 @@ export const Summary = memo(() => {
   });
 
   useEffect(() => {
-    if (brokerTool && !isToolLoading && selectedPoolSymbol) {
+    if (
+      brokerTool &&
+      !isToolLoading &&
+      selectedPoolSymbol &&
+      lastDepositTime < Date.now()
+    ) {
       brokerTool
         .getBrokerDesignation(selectedPoolSymbol)
         .then(setLotsPurchased);
@@ -64,7 +74,7 @@ export const Summary = memo(() => {
       brokerTool.getCurrentBrokerVolume(selectedPoolSymbol).then(setVolumeUSD);
       brokerTool.getBrokerInducedFee(selectedPoolSymbol).then(setTotalFee);
     }
-  }, [brokerTool, isToolLoading, selectedPoolSymbol]);
+  }, [brokerTool, isToolLoading, selectedPoolSymbol, lastDepositTime]);
 
   if (isToolLoading) {
     return (

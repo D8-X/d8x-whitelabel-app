@@ -8,9 +8,10 @@ import {
   useWalletClient,
 } from "wagmi";
 
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  lastDepositTimeAtom,
   selectedPoolIdAtom,
   selectedPoolSymbolAtom,
 } from "../../store/blockchain.store";
@@ -41,10 +42,13 @@ export function DepositLots() {
   const exchangeInfo = useAtomValue(exchangeInfoAtom);
   const api = useAtomValue(traderAPIAtom);
 
+  const setLastDepositTime = useSetAtom(lastDepositTimeAtom);
+
   const [depositAmount, setDepositAmount] = useState(0);
   const [inputValue, setInputValue] = useState(`${depositAmount}`);
 
   const transactionSent = useRef(false);
+  const [waitingForTx, setWaitingForTx] = useState(false);
 
   const inputValueChangedRef = useRef(false);
 
@@ -52,12 +56,30 @@ export function DepositLots() {
     return walletClient?.chain?.id;
   }, [walletClient]);
 
+  const marginTokenDecimals = useMemo(() => {
+    if (!api || selectedPoolSymbol === "") {
+      return undefined;
+    }
+    let decimals: number | undefined = undefined;
+    try {
+      decimals = api.getMarginTokenDecimalsFromSymbol(selectedPoolSymbol);
+    } catch (e) {
+      console.error(e);
+    }
+    return decimals;
+  }, [api, selectedPoolSymbol]);
+
   const lotSize = useMemo(() => {
-    const selectedPool = exchangeInfo?.pools.find(
+    const brokerCollateralLotSize = exchangeInfo?.pools.find(
       (pool) => pool.poolSymbol === selectedPoolSymbol
-    );
-    return selectedPool?.brokerCollateralLotSize;
-  }, [selectedPoolSymbol, exchangeInfo]);
+    )?.brokerCollateralLotSize;
+    if (
+      brokerCollateralLotSize !== undefined &&
+      marginTokenDecimals !== undefined
+    ) {
+      return 10 ** -10 * Math.ceil(brokerCollateralLotSize * 10 ** 10);
+    }
+  }, [selectedPoolSymbol, marginTokenDecimals, exchangeInfo]);
 
   const handleInputCapture = useCallback((orderSizeValue: string) => {
     if (orderSizeValue) {
@@ -83,26 +105,18 @@ export function DepositLots() {
     return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
   }, [exchangeInfo]);
 
-  const marginTokenDecimals = useMemo(() => {
-    if (!api || selectedPoolSymbol === "") {
-      return undefined;
-    }
-    let decimals: number | undefined = undefined;
-    try {
-      decimals = api.getMarginTokenDecimalsFromSymbol(selectedPoolSymbol);
-    } catch (e) {
-      console.error(e);
-    }
-    return decimals;
-  }, [api, selectedPoolSymbol]);
-
   const amountInUnits = useMemo(() => {
-    return lotSize !== undefined &&
+    if (
+      lotSize !== undefined &&
       depositAmount !== undefined &&
       marginTokenDecimals !== undefined &&
       depositAmount > 0
-      ? parseUnits((lotSize * depositAmount).toString(), marginTokenDecimals)
-      : undefined;
+    ) {
+      return parseUnits(
+        (lotSize * depositAmount).toString(),
+        marginTokenDecimals
+      );
+    }
   }, [lotSize, depositAmount, marginTokenDecimals]);
 
   const {
@@ -120,6 +134,20 @@ export function DepositLots() {
       walletClient?.account?.address as `0x${string}`,
       proxyAddr as `0x${string}`,
     ],
+  });
+
+  const {
+    data: balance,
+    refetch: refetchBalance,
+    isFetching: isFetchingBalance,
+  } = useContractRead({
+    address: poolTokenAddr,
+    abi: erc20ABI,
+    functionName: "balanceOf",
+    chainId: chainId,
+    enabled:
+      proxyAddr !== undefined && walletClient?.account?.address !== undefined,
+    args: [walletClient?.account?.address as `0x${string}`],
   });
 
   const { config: approveConfig } = usePrepareContractWrite({
@@ -159,13 +187,15 @@ export function DepositLots() {
   const { data: approveTxn, writeAsync: approve } =
     useContractWrite(approveConfig);
 
-  const { writeAsync: execute } = useContractWrite(depositLotsConfig);
+  const { data: depositTxn, writeAsync: execute } =
+    useContractWrite(depositLotsConfig);
 
   const approveToken = useCallback(async () => {
     if (transactionSent.current || !approve) {
       return;
     }
     transactionSent.current = true;
+    setWaitingForTx(true);
     await approve()
       .then((result) => {
         console.log("approve txn sent", result.hash);
@@ -173,13 +203,14 @@ export function DepositLots() {
       .finally(() => {
         transactionSent.current = false;
       });
-  }, [approve]);
+  }, [approve, setWaitingForTx]);
 
   const depositLots = useCallback(async () => {
     if (transactionSent.current || !execute) {
       return;
     }
     transactionSent.current = true;
+    setWaitingForTx(true);
     await execute()
       .then((result) => {
         console.log("deposit txn sent", result.hash);
@@ -187,15 +218,74 @@ export function DepositLots() {
       .finally(() => {
         transactionSent.current = false;
       });
-  }, [execute]);
+  }, [execute, setWaitingForTx]);
 
   useWaitForTransaction({
     hash: approveTxn?.hash,
+    confirmations: 5,
     onSuccess: () => {
       console.log("approve txn confirmed", approveTxn?.hash);
-      refetchAllowance?.().then(() => depositLots().then());
+      setWaitingForTx(false);
+      refetchBalance?.().then();
+      refetchAllowance?.().then();
     },
   });
+
+  useWaitForTransaction({
+    hash: depositTxn?.hash,
+    confirmations: 10,
+    onSuccess: () => {
+      console.log("deposit txn confirmed", depositTxn?.hash);
+      setWaitingForTx(false);
+      refetchBalance?.().then();
+      refetchAllowance?.().then();
+      setLastDepositTime(Date.now());
+    },
+  });
+
+  const [buttonMessage, isButtonEnabled] = useMemo(() => {
+    if (amountInUnits === undefined) {
+      return ["Enter Amount", false];
+    } else if (waitingForTx) {
+      return ["Processing...", false];
+    } else if (
+      allowance === undefined ||
+      balance === undefined ||
+      isFetching ||
+      isFetchingBalance
+    ) {
+      return ["Loading...", false];
+    } else if (amountInUnits > balance) {
+      return ["Insufficient Balance", false];
+    } else if (allowance < amountInUnits) {
+      return ["Approve Allowance", true];
+    } else {
+      return ["Buy Lots", true];
+    }
+  }, [
+    allowance,
+    balance,
+    amountInUnits,
+    isFetchingBalance,
+    isFetching,
+    waitingForTx,
+  ]);
+
+  const handleClick = () => {
+    if (
+      allowance !== undefined &&
+      amountInUnits !== undefined &&
+      balance !== undefined
+    ) {
+      if (allowance >= amountInUnits && balance >= amountInUnits) {
+        return depositLots().then();
+      } else {
+        return approveToken().then();
+      }
+    } else {
+      console.log("should not be here");
+    }
+  };
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -215,14 +305,8 @@ export function DepositLots() {
         <Grid item xs={6}>
           <Item>
             <Button
-              onClick={() => {
-                (allowance ?? 0) > (amountInUnits ?? 0)
-                  ? depositLots().then()
-                  : approveToken().then();
-              }}
-              disabled={
-                depositAmount <= 0 || transactionSent.current || isFetching
-              }
+              onClick={handleClick}
+              disabled={!isButtonEnabled || transactionSent.current}
               variant="contained" // Use the contained style for more emphasis
               color="primary" // Make the button stand out with a primary color
               size="large" // Optionally increase the size for better accessibility
@@ -242,9 +326,7 @@ export function DepositLots() {
                 },
               }} // Optional: Make the button full width of its container
             >
-              {(allowance ?? 0) > (amountInUnits ?? 0)
-                ? "Buy Lots"
-                : "Approve Allowance"}
+              {buttonMessage}
             </Button>
           </Item>
         </Grid>
