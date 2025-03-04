@@ -9,7 +9,7 @@ import {
 import { Box, Button, Grid, Paper, styled } from "@mui/material";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Address, erc20Abi, parseUnits } from "viem";
+import { Address, erc20Abi, parseUnits, zeroAddress } from "viem";
 import { flatTokenAbi } from "../../abi/flatTokenAbi";
 import { DEPOSIT_ABI } from "../../constants";
 import {
@@ -118,38 +118,43 @@ export function DepositLots() {
     }
   }, [lotSize, depositAmount, marginTokenDecimals]);
 
-  const { data: registeredToken } = useReadContract({
+  const { data: registeredToken, refetch: refetchRegisteredToken } =
+    useReadContract({
+      address: poolTokenAddr,
+      abi: flatTokenAbi,
+      functionName: "registeredToken",
+      args: [walletClient?.account?.address as Address],
+      query: { enabled: !!walletClient?.account?.address && !!poolTokenAddr },
+    });
+
+  const { data: supportedTokens } = useReadContract({
     address: poolTokenAddr,
     abi: flatTokenAbi,
-    functionName: "registeredToken",
-    args: [walletClient?.account?.address as Address],
-
-    query: { enabled: !!walletClient?.account?.address && !!poolTokenAddr },
+    functionName: "getSupportedTokens",
+    query: { enabled: !!poolTokenAddr },
   });
 
   const spenderAddr = useMemo(() => {
-    if (exchangeInfo?.chainId === 80094 && selectedPoolId === 1) {
+    if (supportedTokens) {
       // composite token is spender
       return poolTokenAddr;
     } else {
       // proxy
       return exchangeInfo?.proxyAddr as Address | undefined;
     }
-  }, [exchangeInfo, selectedPoolId, poolTokenAddr]);
+  }, [exchangeInfo, supportedTokens, poolTokenAddr]);
 
   const userTokenAddr = useMemo(() => {
-    if (
-      exchangeInfo?.chainId === 80094 &&
-      selectedPoolId === 1 &&
-      !!registeredToken
-    ) {
+    if (supportedTokens) {
       // user pays in another token
-      return registeredToken;
+      return registeredToken && registeredToken !== zeroAddress
+        ? registeredToken
+        : supportedTokens[0];
     } else {
       // normal case
       return poolTokenAddr;
     }
-  }, [exchangeInfo, selectedPoolId, poolTokenAddr, registeredToken]);
+  }, [supportedTokens, poolTokenAddr, registeredToken]);
 
   const {
     data: allowance,
@@ -182,6 +187,7 @@ export function DepositLots() {
       enabled:
         userTokenAddr !== undefined &&
         walletClient?.account?.address !== undefined,
+      refetchInterval: 7_000,
     },
     args: [walletClient?.account?.address as `0x${string}`],
   });
@@ -200,6 +206,19 @@ export function DepositLots() {
       amountInUnits !== undefined &&
       amountInUnits > allowance,
     args: [spenderAddr, amountInUnits] as [`0x${string}`, bigint],
+  };
+
+  const registerConfig = {
+    address: poolTokenAddr as Address,
+    abi: flatTokenAbi,
+    functionName: "registerAccount" as const,
+    chainId: chainId,
+    enabled:
+      isConnected &&
+      walletClient?.chain !== undefined &&
+      supportedTokens !== undefined &&
+      poolTokenAddr !== undefined,
+    args: [supportedTokens?.[0]] as [Address],
   };
 
   const depositLotsConfig = {
@@ -225,6 +244,7 @@ export function DepositLots() {
 
   const [approveTxn, setApproveTxn] = useState<Address | undefined>();
   const [depositTxn, setDepositTxn] = useState<Address | undefined>();
+  const [registerTxn, setRegisterTxn] = useState<Address | undefined>();
 
   const approve = async () => {
     return writeContractAsync(approveConfig).then((hash) => {
@@ -236,6 +256,13 @@ export function DepositLots() {
   const execute = async () => {
     return writeContractAsync(depositLotsConfig).then((hash) => {
       setDepositTxn(hash);
+      return hash;
+    });
+  };
+
+  const register = async () => {
+    return writeContractAsync(registerConfig).then((hash) => {
+      setRegisterTxn(hash);
       return hash;
     });
   };
@@ -270,6 +297,21 @@ export function DepositLots() {
       });
   };
 
+  const registerAccount = async () => {
+    if (transactionSent.current || !register) {
+      return;
+    }
+    transactionSent.current = true;
+    setWaitingForTx(true);
+    await register()
+      .then((result) => {
+        console.log("register txn sent", result);
+      })
+      .finally(() => {
+        transactionSent.current = false;
+      });
+  };
+
   const { isSuccess: approveSuccess, isError: approveError } =
     useWaitForTransactionReceipt({
       hash: approveTxn,
@@ -280,6 +322,11 @@ export function DepositLots() {
       hash: depositTxn,
     });
 
+  const { isSuccess: registerSuccess, isError: registerError } =
+    useWaitForTransactionReceipt({
+      hash: registerTxn,
+    });
+
   useEffect(() => {
     if (approveSuccess) {
       refetchBalance?.().then();
@@ -288,6 +335,22 @@ export function DepositLots() {
       setWaitingForTx(false);
     }
   }, [approveSuccess, refetchBalance, refetchAllowance]);
+
+  useEffect(() => {
+    if (registerSuccess) {
+      refetchRegisteredToken?.().then();
+      setRegisterTxn(undefined);
+      setWaitingForTx(false);
+    }
+  }, [registerSuccess, refetchRegisteredToken]);
+
+  useEffect(() => {
+    if (registerError) {
+      setRegisterTxn(undefined);
+      setWaitingForTx(false);
+      refetchRegisteredToken?.().then();
+    }
+  }, [registerError, refetchRegisteredToken]);
 
   useEffect(() => {
     if (approveError) {
@@ -316,7 +379,12 @@ export function DepositLots() {
   }, [executeError]);
 
   const [buttonMessage, isButtonEnabled] = useMemo(() => {
-    if (amountInUnits === undefined) {
+    if (
+      supportedTokens &&
+      (!registeredToken || registeredToken === zeroAddress)
+    ) {
+      return ["Register Token", true];
+    } else if (amountInUnits === undefined) {
       return ["Enter Amount", false];
     } else if (waitingForTx) {
       return ["Processing...", false];
@@ -341,6 +409,8 @@ export function DepositLots() {
     isFetchingBalance,
     isFetching,
     waitingForTx,
+    supportedTokens,
+    registeredToken,
   ]);
 
   const handleClick = () => {
@@ -349,7 +419,12 @@ export function DepositLots() {
       amountInUnits !== undefined &&
       balance !== undefined
     ) {
-      if (allowance >= amountInUnits && balance >= amountInUnits) {
+      if (
+        (supportedTokens && !registeredToken) ||
+        registeredToken === zeroAddress
+      ) {
+        return registerAccount().then();
+      } else if (allowance >= amountInUnits && balance >= amountInUnits) {
         return depositLots().then();
       } else {
         return approveToken().then();

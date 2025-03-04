@@ -54,6 +54,7 @@ export const Summary = () => {
   const { data: utilityTokenBalance } = useBalance({
     address: data?.account?.address,
     token: utilityTokenAddr,
+    query: { refetchInterval: 10_000 },
   });
 
   useEffect(() => {
@@ -61,7 +62,8 @@ export const Summary = () => {
       brokerTool &&
       !isToolLoading &&
       selectedPoolSymbol &&
-      lastDepositTime < Date.now()
+      lastDepositTime < Date.now() &&
+      utilityTokenBalance
     ) {
       brokerTool
         .getBrokerDesignation(selectedPoolSymbol)
@@ -74,7 +76,13 @@ export const Summary = () => {
       brokerTool.getCurrentBrokerVolume(selectedPoolSymbol).then(setVolumeUSD);
       brokerTool.getBrokerInducedFee(selectedPoolSymbol).then(setTotalFee);
     }
-  }, [brokerTool, isToolLoading, selectedPoolSymbol, lastDepositTime]);
+  }, [
+    utilityTokenBalance,
+    brokerTool,
+    isToolLoading,
+    selectedPoolSymbol,
+    lastDepositTime,
+  ]);
 
   if (isToolLoading) {
     return (
