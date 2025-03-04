@@ -8,7 +8,9 @@ const useTraderAPI = () => {
 
   const isLoadingRef = useRef(false);
 
-  const [connectedChainId, setConnectedChainId] = useState(traderAPI?.chainId);
+  const [connectedChainId, setConnectedChainId] = useState(
+    Number(traderAPI?.chainId)
+  );
 
   const connectAsync = useCallback(
     async (_chainId: number) => {
@@ -28,7 +30,7 @@ const useTraderAPI = () => {
         .createProxyInstance()
         .then(() => {
           setTraderAPI(api);
-          setConnectedChainId(api.chainId);
+          setConnectedChainId(Number(api.chainId));
         })
         .catch(console.error)
         .finally(() => {

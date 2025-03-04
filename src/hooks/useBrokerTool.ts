@@ -13,20 +13,22 @@ const useBrokerTool = (chainId: number | undefined) => {
     if (
       !signer ||
       chainId === undefined ||
-      (!!brokerTool && brokerTool.chainId === chainId)
+      (!!brokerTool && Number(brokerTool.chainId) === chainId)
     ) {
       return;
     }
     setLoading(true);
-    const obj = new BrokerTool(
-      PerpetualDataHandler.readSDKConfig(chainId),
-      signer
-    );
-    obj
-      .createProxyInstance()
-      .then(() => setBrokertool(obj))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    signer.then((s) => {
+      const obj = new BrokerTool(
+        PerpetualDataHandler.readSDKConfig(chainId),
+        s
+      );
+      obj
+        .createProxyInstance()
+        .then(() => setBrokertool(obj))
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    });
   }, [chainId, signer, brokerTool, setBrokertool, setLoading]);
   return { brokerTool: brokerTool, isLoading: isLoading };
 };

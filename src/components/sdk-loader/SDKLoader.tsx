@@ -18,7 +18,11 @@ export const SDKLoader = memo(() => {
   }, [walletClient]);
 
   useEffect(() => {
-    if (!chainId || traderAPI?.chainId === chainId || loadingAPIRef.current) {
+    if (
+      !chainId ||
+      Number(traderAPI?.chainId) === chainId ||
+      loadingAPIRef.current
+    ) {
       return;
     }
     loadingAPIRef.current = true;

@@ -1,25 +1,24 @@
 import {
-  erc20ABI,
   useAccount,
-  useContractRead,
-  useContractWrite,
-  usePrepareContractWrite,
-  useWaitForTransaction,
+  useReadContract,
+  useWaitForTransactionReceipt,
   useWalletClient,
+  useWriteContract,
 } from "wagmi";
 
+import { Box, Button, Grid, Paper, styled } from "@mui/material";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Address, erc20Abi, parseUnits } from "viem";
+import { flatTokenAbi } from "../../abi/flatTokenAbi";
+import { DEPOSIT_ABI } from "../../constants";
 import {
   lastDepositTimeAtom,
   selectedPoolIdAtom,
   selectedPoolSymbolAtom,
 } from "../../store/blockchain.store";
-import { Box, Button, Grid, Paper, styled } from "@mui/material";
-import { ResponsiveInput } from "../responsive-input/ResponsiveInput";
-import { parseUnits } from "viem";
-import { DEPOSIT_ABI } from "../../constants";
 import { exchangeInfoAtom, traderAPIAtom } from "../../store/sdk.store";
+import { ResponsiveInput } from "../responsive-input/ResponsiveInput";
 
 const Item = styled(Paper)(({ theme }) => ({
   backgroundColor: theme.palette.mode === "dark" ? "#1A2027" : "#fff",
@@ -101,9 +100,9 @@ export function DepositLots() {
     )?.marginTokenAddr as `0x${string}` | undefined;
   }, [exchangeInfo, selectedPoolSymbol]);
 
-  const proxyAddr = useMemo(() => {
-    return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
-  }, [exchangeInfo]);
+  // const proxyAddr = useMemo(() => {
+  //   return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
+  // }, [exchangeInfo]);
 
   const amountInUnits = useMemo(() => {
     if (
@@ -119,56 +118,94 @@ export function DepositLots() {
     }
   }, [lotSize, depositAmount, marginTokenDecimals]);
 
+  const { data: registeredToken } = useReadContract({
+    address: poolTokenAddr,
+    abi: flatTokenAbi,
+    functionName: "registeredToken",
+    args: [walletClient?.account?.address as Address],
+
+    query: { enabled: !!walletClient?.account?.address && !!poolTokenAddr },
+  });
+
+  const spenderAddr = useMemo(() => {
+    if (exchangeInfo?.chainId === 80094 && selectedPoolId === 1) {
+      // composite token is spender
+      return poolTokenAddr;
+    } else {
+      // proxy
+      return exchangeInfo?.proxyAddr as Address | undefined;
+    }
+  }, [exchangeInfo, selectedPoolId, poolTokenAddr]);
+
+  const userTokenAddr = useMemo(() => {
+    if (
+      exchangeInfo?.chainId === 80094 &&
+      selectedPoolId === 1 &&
+      !!registeredToken
+    ) {
+      // user pays in another token
+      return registeredToken;
+    } else {
+      // normal case
+      return poolTokenAddr;
+    }
+  }, [exchangeInfo, selectedPoolId, poolTokenAddr, registeredToken]);
+
   const {
     data: allowance,
     refetch: refetchAllowance,
     isFetching,
-  } = useContractRead({
-    address: poolTokenAddr,
-    abi: erc20ABI,
+  } = useReadContract({
+    address: userTokenAddr,
+    abi: erc20Abi,
     functionName: "allowance",
     chainId: chainId,
-    enabled:
-      proxyAddr !== undefined && walletClient?.account?.address !== undefined,
-    args: [
-      walletClient?.account?.address as `0x${string}`,
-      proxyAddr as `0x${string}`,
-    ],
+    query: {
+      enabled:
+        userTokenAddr !== undefined &&
+        spenderAddr !== undefined &&
+        walletClient?.account?.address !== undefined,
+    },
+    args: [walletClient?.account?.address as Address, spenderAddr as Address],
   });
 
   const {
     data: balance,
     refetch: refetchBalance,
     isFetching: isFetchingBalance,
-  } = useContractRead({
-    address: poolTokenAddr,
-    abi: erc20ABI,
+  } = useReadContract({
+    address: userTokenAddr,
+    abi: erc20Abi,
     functionName: "balanceOf",
     chainId: chainId,
-    enabled:
-      proxyAddr !== undefined && walletClient?.account?.address !== undefined,
+    query: {
+      enabled:
+        userTokenAddr !== undefined &&
+        walletClient?.account?.address !== undefined,
+    },
     args: [walletClient?.account?.address as `0x${string}`],
   });
 
-  const { config: approveConfig } = usePrepareContractWrite({
-    address: poolTokenAddr,
-    abi: erc20ABI,
-    functionName: "approve",
+  const approveConfig = {
+    address: userTokenAddr as Address,
+    abi: erc20Abi,
+    functionName: "approve" as const,
     chainId: chainId,
     enabled:
       isConnected &&
       walletClient?.chain !== undefined &&
-      proxyAddr !== undefined &&
+      spenderAddr !== undefined &&
+      userTokenAddr !== undefined &&
       allowance !== undefined &&
       amountInUnits !== undefined &&
       amountInUnits > allowance,
-    args: [proxyAddr as `0x${string}`, amountInUnits as bigint],
-  });
+    args: [spenderAddr, amountInUnits] as [`0x${string}`, bigint],
+  };
 
-  const { config: depositLotsConfig } = usePrepareContractWrite({
-    address: exchangeInfo?.proxyAddr as `0x${string}` | undefined,
+  const depositLotsConfig = {
+    address: exchangeInfo?.proxyAddr as Address,
     abi: DEPOSIT_ABI,
-    functionName: "depositBrokerLots",
+    functionName: "depositBrokerLots" as const,
     chainId: chainId,
     enabled:
       isConnected &&
@@ -179,18 +216,31 @@ export function DepositLots() {
       selectedPoolId > 0 &&
       depositAmount > 0 &&
       allowance >= amountInUnits,
-    args: [selectedPoolId as number, depositAmount],
+    args: [selectedPoolId, depositAmount] as [number, number],
     gas: 2_000_000n,
     account: address,
-  });
+  };
 
-  const { data: approveTxn, writeAsync: approve } =
-    useContractWrite(approveConfig);
+  const { writeContractAsync } = useWriteContract();
 
-  const { data: depositTxn, writeAsync: execute } =
-    useContractWrite(depositLotsConfig);
+  const [approveTxn, setApproveTxn] = useState<Address | undefined>();
+  const [depositTxn, setDepositTxn] = useState<Address | undefined>();
 
-  const approveToken = useCallback(async () => {
+  const approve = async () => {
+    return writeContractAsync(approveConfig).then((hash) => {
+      setApproveTxn(hash);
+      return hash;
+    });
+  };
+
+  const execute = async () => {
+    return writeContractAsync(depositLotsConfig).then((hash) => {
+      setDepositTxn(hash);
+      return hash;
+    });
+  };
+
+  const approveToken = async () => {
     if (transactionSent.current || !approve) {
       return;
     }
@@ -198,14 +248,14 @@ export function DepositLots() {
     setWaitingForTx(true);
     await approve()
       .then((result) => {
-        console.log("approve txn sent", result.hash);
+        console.log("approve txn sent", result);
       })
       .finally(() => {
         transactionSent.current = false;
       });
-  }, [approve, setWaitingForTx]);
+  };
 
-  const depositLots = useCallback(async () => {
+  const depositLots = async () => {
     if (transactionSent.current || !execute) {
       return;
     }
@@ -213,41 +263,57 @@ export function DepositLots() {
     setWaitingForTx(true);
     await execute()
       .then((result) => {
-        console.log("deposit txn sent", result.hash);
+        console.log("deposit txn sent", result);
       })
       .finally(() => {
         transactionSent.current = false;
       });
-  }, [execute, setWaitingForTx]);
+  };
 
-  useWaitForTransaction({
-    hash: approveTxn?.hash,
-    confirmations: 5,
-    onSuccess: () => {
-      console.log("approve txn confirmed", approveTxn?.hash);
+  const { isSuccess: approveSuccess, isError: approveError } =
+    useWaitForTransactionReceipt({
+      hash: approveTxn,
+    });
+
+  const { isSuccess: executeSuccess, isError: executeError } =
+    useWaitForTransactionReceipt({
+      hash: depositTxn,
+    });
+
+  useEffect(() => {
+    if (approveSuccess) {
       refetchBalance?.().then();
       refetchAllowance?.().then();
-    },
-    onSettled: () => {
+      setApproveTxn(undefined);
       setWaitingForTx(false);
-    },
-  });
+    }
+  }, [approveSuccess, refetchBalance, refetchAllowance]);
 
-  useWaitForTransaction({
-    hash: depositTxn?.hash,
-    confirmations: 10,
-    onSuccess: () => {
-      console.log("deposit txn confirmed", depositTxn?.hash);
+  useEffect(() => {
+    if (approveError) {
+      setApproveTxn(undefined);
+      setWaitingForTx(false);
+    }
+  }, [approveError]);
+
+  useEffect(() => {
+    if (executeSuccess) {
       refetchBalance?.().then();
       refetchAllowance?.().then();
       setDepositAmount(0);
       setInputValue("");
       setLastDepositTime(Date.now());
-    },
-    onSettled: () => {
+      setDepositTxn(undefined);
       setWaitingForTx(false);
-    },
-  });
+    }
+  }, [executeSuccess, refetchBalance, refetchAllowance, setLastDepositTime]);
+
+  useEffect(() => {
+    if (executeError) {
+      setApproveTxn(undefined);
+      setWaitingForTx(false);
+    }
+  }, [executeError]);
 
   const [buttonMessage, isButtonEnabled] = useMemo(() => {
     if (amountInUnits === undefined) {
