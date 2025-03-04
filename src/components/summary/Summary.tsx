@@ -4,7 +4,7 @@ import {
   selectedPoolSymbolAtom,
 } from "../../store/blockchain.store";
 import { useAtom, useAtomValue } from "jotai";
-import { memo, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useBrokerTool from "../../hooks/useBrokerTool";
 import {
   Box,
@@ -18,7 +18,7 @@ import {
   Tooltip,
 } from "@mui/material";
 
-export const Summary = memo(() => {
+export const Summary = () => {
   const { data } = useWalletClient();
   const chainId = useMemo(() => data?.chain?.id, [data?.chain]);
 
@@ -184,4 +184,4 @@ export const Summary = memo(() => {
       </Grid>
     </Box>
   );
-});
+};
