@@ -104,6 +104,15 @@ export function DepositLots() {
   //   return exchangeInfo?.proxyAddr as `0x${string}` | undefined;
   // }, [exchangeInfo]);
 
+  const { data: registeredToken, refetch: refetchRegisteredToken } =
+    useReadContract({
+      address: poolTokenAddr,
+      abi: flatTokenAbi,
+      functionName: "registeredToken",
+      args: [walletClient?.account?.address as Address],
+      query: { enabled: !!walletClient?.account?.address && !!poolTokenAddr },
+    });
+
   const amountInUnits = useMemo(() => {
     if (
       lotSize !== undefined &&
@@ -113,19 +122,12 @@ export function DepositLots() {
     ) {
       return parseUnits(
         (lotSize * depositAmount).toString(),
-        marginTokenDecimals
+        !registeredToken || registeredToken === zeroAddress
+          ? marginTokenDecimals
+          : 18
       );
     }
   }, [lotSize, depositAmount, marginTokenDecimals]);
-
-  const { data: registeredToken, refetch: refetchRegisteredToken } =
-    useReadContract({
-      address: poolTokenAddr,
-      abi: flatTokenAbi,
-      functionName: "registeredToken",
-      args: [walletClient?.account?.address as Address],
-      query: { enabled: !!walletClient?.account?.address && !!poolTokenAddr },
-    });
 
   const { data: supportedTokens } = useReadContract({
     address: poolTokenAddr,
